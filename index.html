@@ -90,6 +90,13 @@ h2{font-family:var(--display);font-size:22px;margin:0;text-wrap:balance}
 .edits summary:focus-visible{outline:2px solid var(--red);outline-offset:2px}
 .ecount{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--red);color:#fff}
 .ecount.zero{background:var(--plan-bg);color:var(--muted)}
+.ecount.alldone{background:var(--ok);color:#fff}
+.edits.e-new,.edits.e-done{border-top:0;border-left:4px solid;border-radius:8px;padding:8px 10px;transition:background .3s}
+.edits.e-new{background:var(--wait-bg);border-left-color:var(--wait)}
+.edits.e-new summary{color:var(--wait)}
+.edits.e-done{background:var(--ok-bg);border-left-color:var(--ok)}
+.edits.e-done summary{color:var(--ok)}
+.edits.e-new .elist li,.edits.e-done .elist li{background:var(--panel)}
 .elist{display:grid;gap:6px;margin:8px 0 0;padding:0;list-style:none}
 .elist li{font-size:13px;padding:8px 10px;border-radius:8px;background:var(--plan-bg);display:grid;gap:3px;min-width:0;overflow-wrap:anywhere}
 .elist li.done{opacity:.65}
@@ -256,17 +263,22 @@ function editsList(k){
   if(!arr.length) return `<li class="empty" style="background:none;padding:0">Правок пока нет</li>`;
   return arr.map(e=>`<li class="${e.status==="done"?"done":""}"><span class="eh"><span class="ebadge ${e.status}">${e.status==="done"?"внесено":"новая"}</span>${escH(e.who||"")}, ${fmt(e.at)}${e.status==="done"&&e.done_at?` · внесено ${fmt(e.done_at)}`:""}</span><span>${escH(e.body)}</span>${e.note?`<span class="eh">Ответ: ${escH(e.note)}</span>`:""}</li>`).join("");
 }
-function ecount(k){ const n=(EDITS[k]||[]).filter(e=>e.status==="new").length; return `<span class="ecount${n?"":" zero"}" id="ec_${k}">${n?("новых: "+n):"нет новых"}</span>`; }
+function estate(k){ const a=EDITS[k]||[]; if(!a.length) return ""; return a.some(e=>e.status==="new") ? "e-new" : "e-done"; }
+function ecount(k){ const a=EDITS[k]||[], n=a.filter(e=>e.status==="new").length;
+  const cls = n ? "" : (a.length ? " alldone" : " zero");
+  const txt = n ? ("новых: "+n) : (a.length ? "все внесены ✓" : "нет новых");
+  return `<span class="ecount${cls}" id="ec_${k}">${txt}</span>`; }
 function editsBlock(x){
   const k=x.k;
-  return `<details class="edits" id="ed_${k}"><summary>Правки ${ecount(k)}</summary>
+  return `<details class="edits ${estate(k)}" id="ed_${k}"><summary>Правки ${ecount(k)}</summary>
     <ul class="elist" id="el_${k}">${editsList(k)}</ul>
     <div class="eform"><textarea id="ta_${k}" maxlength="4000" placeholder="Написать правку: что и где изменить" aria-label="Текст правки"></textarea>
     <div class="ebtns"><button type="button" class="save" data-save="${k}">Сохранить правку</button>${SR?`<button type="button" class="rec" data-rec="${k}" aria-pressed="false">🎙 Надиктовать</button>`:`<span class="hint">Диктовка работает в Chrome</span>`}<span class="hint" id="eh_${k}"></span></div></div></details>`;
 }
 function paintEdits(){
   L.forEach(x=>{ const ul=document.getElementById("el_"+x.k); if(ul) ul.innerHTML=editsList(x.k);
-    const c=document.getElementById("ec_"+x.k); if(c) c.outerHTML=ecount(x.k); });
+    const c=document.getElementById("ec_"+x.k); if(c) c.outerHTML=ecount(x.k);
+    const d=document.getElementById("ed_"+x.k); if(d){ d.classList.remove("e-new","e-done"); const st=estate(x.k); if(st) d.classList.add(st); } });
 }
 async function loadEdits(){
   try{ const r=await fetch(SB_EDITS+"?select=*&order=at.asc",{headers:H}); if(!r.ok) throw 0; const rows=await r.json();
