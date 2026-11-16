@@ -268,11 +268,14 @@ function ecount(k){ const a=EDITS[k]||[], n=a.filter(e=>e.status==="new").length
   const cls = n ? "" : (a.length ? " alldone" : " zero");
   const txt = n ? ("новых: "+n) : (a.length ? "все внесены ✓" : "нет новых");
   return `<span class="ecount${cls}" id="ec_${k}">${txt}</span>`; }
+function dGet(k){ try{ return localStorage.getItem("chp26_draft_"+k)||""; }catch(e){ return DR[k]||""; } }
+function dSet(k,v){ DR[k]=v; try{ v ? localStorage.setItem("chp26_draft_"+k,v) : localStorage.removeItem("chp26_draft_"+k); }catch(e){} }
+var DR={};
 function editsBlock(x){
   const k=x.k;
-  return `<details class="edits ${estate(k)}" id="ed_${k}"><summary>Правки ${ecount(k)}</summary>
+  return `<details class="edits ${estate(k)}" id="ed_${k}"${dGet(k)?" open":""}><summary>Правки ${ecount(k)}</summary>
     <ul class="elist" id="el_${k}">${editsList(k)}</ul>
-    <div class="eform"><textarea id="ta_${k}" maxlength="4000" placeholder="Написать правку: что и где изменить" aria-label="Текст правки"></textarea>
+    <div class="eform"><textarea id="ta_${k}" maxlength="4000" placeholder="Написать правку: что и где изменить" aria-label="Текст правки" data-draft="${k}">${escH(dGet(k))}</textarea>
     <div class="ebtns"><button type="button" class="save" data-save="${k}">Сохранить правку</button>${SR?`<button type="button" class="rec" data-rec="${k}" aria-pressed="false">🎙 Надиктовать</button>`:`<span class="hint">Диктовка работает в Chrome</span>`}<span class="hint" id="eh_${k}"></span></div></div></details>`;
 }
 function paintEdits(){
@@ -286,15 +289,17 @@ async function loadEdits(){
   }catch(e){}
 }
 let REC=null, RECK=null;
+document.addEventListener("input", e=>{ const k=e.target.dataset && e.target.dataset.draft; if(k) dSet(k, e.target.value); });
 document.addEventListener("click", async e=>{
   const sv=e.target.closest("[data-save]"), rc=e.target.closest("[data-rec]");
   if(sv){ const k=sv.dataset.save, ta=document.getElementById("ta_"+k), hint=document.getElementById("eh_"+k), body=ta.value.trim();
     if(!body){ hint.textContent="Сначала напишите или надиктуйте правку"; return; }
-    if(!WHO){ hint.textContent="Выберите вверху, кто пишет правку"; document.getElementById("whobar").scrollIntoView({block:"center"}); return; }
+    if(sv.dataset.who) setWho(sv.dataset.who);
+    if(!WHO){ dSet(k,ta.value); hint.innerHTML=`Кто пишет? <button type="button" class="save" data-save="${k}" data-who="Ильдар">Ильдар</button> <button type="button" class="save" data-save="${k}" data-who="Регина">Регина</button> <span>(или впишите имя вверху)</span>`; return; }
     if(REC&&RECK===k){ REC.stop(); }
     sv.disabled=true; hint.textContent="Сохраняю…";
     try{ const r=await fetch(SB_EDITS,{method:"POST",headers:{...H,"Prefer":"return=representation"},body:JSON.stringify({letter_key:k,body,who:WHO})});
-      if(!r.ok) throw 0; const [row]=await r.json(); (EDITS[k]=EDITS[k]||[]).push(row); ta.value=""; paintEdits(); hint.textContent="Сохранено. Claude заберёт по команде «забери правки»";
+      if(!r.ok) throw 0; const [row]=await r.json(); (EDITS[k]=EDITS[k]||[]).push(row); ta.value=""; dSet(k,""); paintEdits(); hint.textContent="Сохранено. Claude заберёт по команде «забери правки»";
     }catch(err){ hint.textContent="Не сохранилось, попробуйте ещё раз"; }
     sv.disabled=false; return; }
   if(rc && SR){ const k=rc.dataset.rec, ta=document.getElementById("ta_"+k), hint=document.getElementById("eh_"+k);
@@ -302,7 +307,7 @@ document.addEventListener("click", async e=>{
     const r=new SR(); r.lang="ru-RU"; r.continuous=true; r.interimResults=true;
     const base=ta.value ? ta.value.replace(/\s*$/," ") : "";
     let fin="";
-    r.onresult=ev=>{ let inter=""; for(let i=ev.resultIndex;i<ev.results.length;i++){ const t=ev.results[i][0].transcript; if(ev.results[i].isFinal) fin+=t+" "; else inter+=t; } ta.value=base+fin+inter; };
+    r.onresult=ev=>{ let inter=""; for(let i=ev.resultIndex;i<ev.results.length;i++){ const t=ev.results[i][0].transcript; if(ev.results[i].isFinal) fin+=t+" "; else inter+=t; } ta.value=base+fin+inter; dSet(k,ta.value); };
     r.onerror=ev=>{ hint.textContent = ev.error==="not-allowed" ? "Разрешите микрофон в браузере" : "Диктовка остановилась, нажмите ещё раз"; };
     r.onend=()=>{ rc.setAttribute("aria-pressed","false"); rc.textContent="🎙 Надиктовать"; if(RECK===k){ REC=null; RECK=null; } if(!hint.textContent.startsWith("Разрешите")) hint.textContent= ta.value.trim() ? "Проверьте текст и нажмите «Сохранить правку»" : ""; };
     try{ r.start(); REC=r; RECK=k; rc.setAttribute("aria-pressed","true"); rc.textContent="■ Остановить"; hint.textContent="Говорите…"; }catch(err){ hint.textContent="Диктовка недоступна в этом окне"; }
