@@ -83,6 +83,29 @@ h2{font-family:var(--display);font-size:22px;margin:0;text-wrap:balance}
 .whobar button:focus-visible{outline:2px solid var(--red);outline-offset:2px}
 .whobar input{font:inherit;font-size:13px;padding:5px 10px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--ink);width:150px}
 .sync{font-size:12px;color:var(--muted)}
+.edits{margin-top:10px;border-top:1px dashed var(--line);padding-top:8px;display:grid;gap:8px}
+.edits summary{cursor:pointer;font-size:13px;font-weight:600;list-style:none;display:inline-flex;align-items:center;gap:8px}
+.edits summary::-webkit-details-marker{display:none}
+.edits summary::before{content:"✎";font-size:13px}
+.edits summary:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+.ecount{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:var(--red);color:#fff}
+.ecount.zero{background:var(--plan-bg);color:var(--muted)}
+.elist{display:grid;gap:6px;margin:8px 0 0;padding:0;list-style:none}
+.elist li{font-size:13px;padding:8px 10px;border-radius:8px;background:var(--plan-bg);display:grid;gap:3px;min-width:0;overflow-wrap:anywhere}
+.elist li.done{opacity:.65}
+.elist .eh{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:11px;color:var(--muted)}
+.ebadge{font-weight:700;padding:1px 7px;border-radius:999px}
+.ebadge.new{background:var(--wait-bg);color:var(--wait)} .ebadge.done{background:var(--ok-bg);color:var(--ok)}
+.eform{display:grid;gap:6px;margin-top:8px}
+.eform textarea{font:inherit;font-size:14px;min-height:64px;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);resize:vertical;width:100%}
+.eform textarea:focus-visible{outline:2px solid var(--red);outline-offset:1px}
+.ebtns{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.ebtns button{all:unset;cursor:pointer;font-size:13px;font-weight:600;padding:6px 12px;border-radius:8px;border:1px solid var(--line);background:var(--panel)}
+.ebtns button.save{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.ebtns button.rec{border-color:var(--red);color:var(--red)}
+.ebtns button[aria-pressed="true"]{background:var(--red);color:#fff}
+.ebtns button:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+.ebtns .hint{font-size:12px;color:var(--muted)}
 .lnks{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
 .lnk{font-size:13px;font-weight:600;text-decoration:none;padding:5px 11px;border-radius:8px;border:1px solid var(--line)}
 .lnk-open{background:var(--ink);color:var(--bg);border-color:var(--ink)}
@@ -224,6 +247,55 @@ const SB_URL = "https://zmbzgkeokedqesoilcmj.supabase.co/rest/v1/chp26_letter_ch
 const SB_KEY = "sb_publishable_rLRV5jNYBuzEcQWDQbnnQA_9mEWldEN";
 const STEPS = [["reviewed","Ильдар проверил"],["approved","Ильдар утвердил"],["allowed","Регине можно отправлять без проверки Ильдара (на её усмотрение)"],["sent","Отправлено"]];
 let CHECKS = {};
+let EDITS = {};
+const SB_EDITS = "https://zmbzgkeokedqesoilcmj.supabase.co/rest/v1/chp26_letter_edits";
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+function escH(t){ return String(t).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function editsList(k){
+  const arr = EDITS[k] || [];
+  if(!arr.length) return `<li class="empty" style="background:none;padding:0">Правок пока нет</li>`;
+  return arr.map(e=>`<li class="${e.status==="done"?"done":""}"><span class="eh"><span class="ebadge ${e.status}">${e.status==="done"?"внесено":"новая"}</span>${escH(e.who||"")}, ${fmt(e.at)}${e.status==="done"&&e.done_at?` · внесено ${fmt(e.done_at)}`:""}</span><span>${escH(e.body)}</span>${e.note?`<span class="eh">Ответ: ${escH(e.note)}</span>`:""}</li>`).join("");
+}
+function ecount(k){ const n=(EDITS[k]||[]).filter(e=>e.status==="new").length; return `<span class="ecount${n?"":" zero"}" id="ec_${k}">${n?("новых: "+n):"нет новых"}</span>`; }
+function editsBlock(x){
+  const k=x.k;
+  return `<details class="edits" id="ed_${k}"><summary>Правки ${ecount(k)}</summary>
+    <ul class="elist" id="el_${k}">${editsList(k)}</ul>
+    <div class="eform"><textarea id="ta_${k}" maxlength="4000" placeholder="Написать правку: что и где изменить" aria-label="Текст правки"></textarea>
+    <div class="ebtns"><button type="button" class="save" data-save="${k}">Сохранить правку</button>${SR?`<button type="button" class="rec" data-rec="${k}" aria-pressed="false">🎙 Надиктовать</button>`:`<span class="hint">Диктовка работает в Chrome</span>`}<span class="hint" id="eh_${k}"></span></div></div></details>`;
+}
+function paintEdits(){
+  L.forEach(x=>{ const ul=document.getElementById("el_"+x.k); if(ul) ul.innerHTML=editsList(x.k);
+    const c=document.getElementById("ec_"+x.k); if(c) c.outerHTML=ecount(x.k); });
+}
+async function loadEdits(){
+  try{ const r=await fetch(SB_EDITS+"?select=*&order=at.asc",{headers:H}); if(!r.ok) throw 0; const rows=await r.json();
+    EDITS={}; rows.forEach(e=>{ (EDITS[e.letter_key]=EDITS[e.letter_key]||[]).push(e); }); paintEdits();
+  }catch(e){}
+}
+let REC=null, RECK=null;
+document.addEventListener("click", async e=>{
+  const sv=e.target.closest("[data-save]"), rc=e.target.closest("[data-rec]");
+  if(sv){ const k=sv.dataset.save, ta=document.getElementById("ta_"+k), hint=document.getElementById("eh_"+k), body=ta.value.trim();
+    if(!body){ hint.textContent="Сначала напишите или надиктуйте правку"; return; }
+    if(!WHO){ hint.textContent="Выберите вверху, кто пишет правку"; document.getElementById("whobar").scrollIntoView({block:"center"}); return; }
+    if(REC&&RECK===k){ REC.stop(); }
+    sv.disabled=true; hint.textContent="Сохраняю…";
+    try{ const r=await fetch(SB_EDITS,{method:"POST",headers:{...H,"Prefer":"return=representation"},body:JSON.stringify({letter_key:k,body,who:WHO})});
+      if(!r.ok) throw 0; const [row]=await r.json(); (EDITS[k]=EDITS[k]||[]).push(row); ta.value=""; paintEdits(); hint.textContent="Сохранено. Claude заберёт по команде «забери правки»";
+    }catch(err){ hint.textContent="Не сохранилось, попробуйте ещё раз"; }
+    sv.disabled=false; return; }
+  if(rc && SR){ const k=rc.dataset.rec, ta=document.getElementById("ta_"+k), hint=document.getElementById("eh_"+k);
+    if(REC){ const same=RECK===k; REC.stop(); if(same) return; }
+    const r=new SR(); r.lang="ru-RU"; r.continuous=true; r.interimResults=true;
+    const base=ta.value ? ta.value.replace(/\s*$/," ") : "";
+    let fin="";
+    r.onresult=ev=>{ let inter=""; for(let i=ev.resultIndex;i<ev.results.length;i++){ const t=ev.results[i][0].transcript; if(ev.results[i].isFinal) fin+=t+" "; else inter+=t; } ta.value=base+fin+inter; };
+    r.onerror=ev=>{ hint.textContent = ev.error==="not-allowed" ? "Разрешите микрофон в браузере" : "Диктовка остановилась, нажмите ещё раз"; };
+    r.onend=()=>{ rc.setAttribute("aria-pressed","false"); rc.textContent="🎙 Надиктовать"; if(RECK===k){ REC=null; RECK=null; } if(!hint.textContent.startsWith("Разрешите")) hint.textContent= ta.value.trim() ? "Проверьте текст и нажмите «Сохранить правку»" : ""; };
+    try{ r.start(); REC=r; RECK=k; rc.setAttribute("aria-pressed","true"); rc.textContent="■ Остановить"; hint.textContent="Говорите…"; }catch(err){ hint.textContent="Диктовка недоступна в этом окне"; }
+  }
+});
 let WHO = ""; try{ WHO = localStorage.getItem("chp26_who") || ""; }catch(e){}
 function fmt(ts){ try{ const d=new Date(ts); return d.toLocaleString("ru-RU",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit",timeZone:"Europe/Moscow"}); }catch(e){ return ""; } }
 function checks(x){
@@ -261,7 +333,7 @@ document.addEventListener("change", async e=>{
     if(!r.ok) throw 0; sync("Сохранено: "+WHO);
   }catch(err){ el.checked=!el.checked; delete CHECKS[row.letter_key+"|"+row.step]; paint(); sync("Не сохранилось, попробуйте ещё раз"); }
 });
-setInterval(load, 60000);
+setInterval(()=>{ load(); loadEdits(); }, 60000);
 document.getElementById("legend").innerHTML = Object.values(ST).map(([c,n])=>`<span class="pill ${c}">${n}</span>`).join("");
 document.getElementById("todo").innerHTML = TODO.map(x=>`<li>${x}</li>`).join("");
 document.getElementById("upd").textContent = "Обновлено: " + UPDATED + ". Панель обновляет Claude после каждого письма.";
@@ -285,12 +357,12 @@ for(let d=11; d<=30; d++){
   const blk = document.createElement("article");
   blk.className = "dayblock"; blk.id = "d"+d;
   const head = `<div class="dh"><span class="d">${d} ноя</span><span class="w">${["воскресенье","понедельник","вторник","среда","четверг","пятница","суббота"][dt.getDay()]}</span>${NOTES[d]?`<span class="note">${NOTES[d]}</span>`:""}</div>`;
-  const body = items.length ? items.map(x=>`<div class="item"><span class="t">${x.t}</span><div class="body"><span class="seg">${x.seg}</span><span class="subj">${x.subj}</span><span class="meta">${x.m}</span>${links(x)}${checks(x)}</div><span class="st pill ${ST[x.st][0]}" data-pill="${x.k}">${ST[x.st][1]}</span></div>`).join("") : `<div class="empty">Писем пока нет в плане</div>`;
+  const body = items.length ? items.map(x=>`<div class="item"><span class="t">${x.t}</span><div class="body"><span class="seg">${x.seg}</span><span class="subj">${x.subj}</span><span class="meta">${x.m}</span>${links(x)}${checks(x)}${editsBlock(x)}</div><span class="st pill ${ST[x.st][0]}" data-pill="${x.k}">${ST[x.st][1]}</span></div>`).join("") : `<div class="empty">Писем пока нет в плане</div>`;
   blk.innerHTML = head + `<div class="items">${body}</div>`;
   agenda.appendChild(blk);
 }
 
-load();
+load(); loadEdits();
 document.getElementById("chains").innerHTML = CHAINS.map(c=>`<div class="chain"><h2>${c.name}</h2><div class="trig">${c.trig}</div><div class="steps">${c.steps.map((s,i)=>`<div class="step"><span class="k">${i+1}</span><div><b>${s[0]}</b>${s[1]}</div></div>`).join("")}</div><span class="pill s-work" style="justify-self:start">Пишем</span></div>`).join("");
 </script>
 
