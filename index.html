@@ -222,7 +222,7 @@ function links(x){
 L.forEach(x=>{ x.k = (x.f && x.f[0]) || ("d"+x.d+"_"+x.t.replace(/\D/g,"")+"_"+x.seg.length); });
 const SB_URL = "https://zmbzgkeokedqesoilcmj.supabase.co/rest/v1/chp26_letter_checks";
 const SB_KEY = "sb_publishable_rLRV5jNYBuzEcQWDQbnnQA_9mEWldEN";
-const STEPS = [["reviewed","Ильдар проверил"],["approved","Ильдар утвердил"],["allowed","Регине можно отправлять"],["sent","Отправлено"]];
+const STEPS = [["reviewed","Ильдар проверил"],["approved","Ильдар утвердил"],["allowed","Регине можно отправлять без проверки Ильдара (на её усмотрение)"],["sent","Отправлено"]];
 let CHECKS = {};
 let WHO = ""; try{ WHO = localStorage.getItem("chp26_who") || ""; }catch(e){}
 function fmt(ts){ try{ const d=new Date(ts); return d.toLocaleString("ru-RU",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit",timeZone:"Europe/Moscow"}); }catch(e){ return ""; } }
