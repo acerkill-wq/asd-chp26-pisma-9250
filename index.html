@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Календарь писем ЧП</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+*,*::before,*::after{box-sizing:border-box} body{margin:0} img{max-width:100%}
+/* Лента дней ноября сверху, ниже повестка по дням и две цепочки дожима */
+:root{
+  --bg:#f6f5f1; --panel:#ffffff; --ink:#151515; --muted:#6b6a64; --line:#e4e2da;
+  --yellow:#F5C400; --red:#E5262A; --ink-on-yellow:#151515;
+  --ok:#1f8a4c; --ok-bg:#e3f3e9; --wait:#a35c00; --wait-bg:#fdf0d8; --check:#2f5bd3; --check-bg:#e6ecfc; --work:#7a3fc4; --work-bg:#efe6fb; --plan:#6b6a64; --plan-bg:#efeee9;
+  --display:"Space Grotesk",system-ui,sans-serif; --body:"Inter",system-ui,-apple-system,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f0f10; --panel:#18181a; --ink:#f1f0ec; --muted:#9d9b94; --line:#2a2a2d;
+  --ok:#5fd08f; --ok-bg:#16301f; --wait:#f0b04d; --wait-bg:#33260f; --check:#8eaaff; --check-bg:#1a2340; --work:#c39bff; --work-bg:#291b3d; --plan:#9d9b94; --plan-bg:#232326; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f0f10; --panel:#18181a; --ink:#f1f0ec; --muted:#9d9b94; --line:#2a2a2d;
+  --ok:#5fd08f; --ok-bg:#16301f; --wait:#f0b04d; --wait-bg:#33260f; --check:#8eaaff; --check-bg:#1a2340; --work:#c39bff; --work-bg:#291b3d; --plan:#9d9b94; --plan-bg:#232326; color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5}
+.wrap{max-width:1080px;margin:0 auto;padding-block:28px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:28px}
+header{display:grid;gap:8px}
+.eyebrow{font-size:12px;letter-spacing:.14em;font-weight:700;text-transform:uppercase;color:var(--muted)}
+h1{font-family:var(--display);font-size:clamp(28px,5vw,42px);line-height:1.05;margin:0;text-wrap:balance}
+h1 b{background:var(--yellow);color:var(--ink-on-yellow);padding:0 .18em;border-radius:4px}
+h2{font-family:var(--display);font-size:22px;margin:0;text-wrap:balance}
+.sub{color:var(--muted);max-width:68ch;margin:0}
+.legend{display:flex;flex-wrap:wrap;gap:8px}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.pill::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.s-ok{color:var(--ok);background:var(--ok-bg)} .s-wait{color:var(--wait);background:var(--wait-bg)} .s-check{color:var(--check);background:var(--check-bg)} .s-work{color:var(--work);background:var(--work-bg)} .s-plan{color:var(--plan);background:var(--plan-bg)}
+/* лента дней */
+.strip{overflow-x:auto;padding-bottom:4px}
+.days{display:grid;grid-template-columns:repeat(20,minmax(46px,1fr));gap:6px;min-width:980px}
+.day{all:unset;cursor:pointer;display:grid;gap:4px;justify-items:center;padding:8px 4px 9px;border-radius:10px;background:var(--panel);border:1px solid var(--line);font-variant-numeric:tabular-nums}
+.day:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+.day .wd{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.day .n{font-family:var(--display);font-size:19px;font-weight:700}
+.day .dots{display:flex;gap:3px;min-height:7px;flex-wrap:wrap;justify-content:center}
+.day .dots i{width:7px;height:7px;border-radius:50%}
+.day.today{background:var(--yellow);border-color:var(--yellow);color:var(--ink-on-yellow)}
+.day.today .wd{color:var(--ink-on-yellow)}
+.day.end{border-color:var(--red)}
+.day.pre .n{color:var(--muted)}
+.day.today.pre .n{color:var(--ink-on-yellow)}
+.phase{display:grid;grid-template-columns:repeat(20,minmax(46px,1fr));gap:6px;min-width:980px;margin-top:6px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.phase span{padding:4px 8px;border-radius:6px}
+.ph1{grid-column:1 / span 6;background:var(--plan-bg);color:var(--muted)}
+.ph2{grid-column:7 / span 14;background:var(--ink);color:var(--bg)}
+/* повестка */
+.agenda{display:grid;gap:14px}
+.dayblock{display:grid;grid-template-columns:120px 1fr;gap:16px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;scroll-margin-top:16px}
+.dayblock.hl{outline:2px solid var(--yellow)}
+.dh{display:grid;align-content:start;gap:2px}
+.dh .d{font-family:var(--display);font-size:24px;font-weight:700;line-height:1}
+.dh .w{color:var(--muted);font-size:13px}
+.dh .note{margin-top:6px;font-size:12px;font-weight:700;color:var(--red)}
+.items{display:grid;gap:10px;min-width:0}
+.item{display:grid;grid-template-columns:62px 1fr auto;gap:12px;align-items:start;padding-top:10px;border-top:1px solid var(--line)}
+.item:first-child{border-top:0;padding-top:0}
+.t{font-variant-numeric:tabular-nums;font-weight:700}
+.body{min-width:0;display:grid;gap:3px}
+.seg{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.subj{font-weight:600}
+.meta{font-size:13px;color:var(--muted)}
+.meta code{font-size:12px;background:var(--plan-bg);padding:1px 5px;border-radius:4px;word-break:break-all}
+.num{font-variant-numeric:tabular-nums;font-weight:700;color:var(--ink)}
+.empty{color:var(--muted);font-size:14px}
+.lnks{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.lnk{font-size:13px;font-weight:600;text-decoration:none;padding:5px 11px;border-radius:8px;border:1px solid var(--line)}
+.lnk-open{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.lnk-cta{color:var(--ink);background:var(--panel)}
+.lnk:hover{border-color:var(--red)} .lnk:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+/* дожим */
+.chains{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.chain{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;display:grid;gap:12px;align-content:start}
+.trig{font-size:13px;color:var(--muted)}
+.steps{display:grid;gap:0;counter-reset:s}
+.step{display:grid;grid-template-columns:30px 1fr;gap:10px;padding:10px 0;border-top:1px dashed var(--line)}
+.step:first-child{border-top:0}
+.step .k{width:26px;height:26px;border-radius:50%;background:var(--yellow);color:var(--ink-on-yellow);font-weight:700;display:grid;place-items:center;font-size:13px}
+.step b{display:block}
+.gift{background:var(--ink);color:var(--bg);border-radius:14px;padding:18px 20px;display:grid;gap:8px}
+.gift h2{color:var(--yellow)}
+.gift ul{margin:0;padding-left:18px;display:grid;gap:4px}
+.todo{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--red);border-radius:12px;padding:16px 18px;display:grid;gap:8px}
+.todo ul{margin:0;padding-left:18px;display:grid;gap:4px}
+footer{color:var(--muted);font-size:13px}
+@media (max-width:640px){
+  .dayblock{grid-template-columns:1fr;gap:10px}
+  .dh{grid-auto-flow:column;justify-content:start;align-items:baseline;gap:10px}
+  .item{grid-template-columns:50px 1fr}
+  .item .st{grid-column:2}
+}
+@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Академия Сметного Дела · рассылки</div>
+    <h1>Письма <b>Чёрной пятницы</b> 2026</h1>
+    <p class="sub">Все письма и сообщения акции по дням: кому, во сколько, с какой темой и на каком этапе. Запись на участие 11–16 ноября, акция 17–30 ноября до 23:59 МСК. Цифры открытий и CTOR взяты из журнала рассылок, замер на второй день.</p>
+    <div class="legend" id="legend"></div>
+  </header>
+
+  <section class="strip" aria-label="Дни">
+    <div class="days" id="days"></div>
+    <div class="phase"><span class="ph1">Запись на участие</span><span class="ph2">Акция 17–30 ноября</span></div>
+  </section>
+
+  <section class="todo" aria-label="Ждёт решения">
+    <h2>Ждёт решения</h2>
+    <ul id="todo"></ul>
+  </section>
+
+  <section class="agenda" id="agenda" aria-label="Письма по дням"></section>
+
+  <section style="display:grid;gap:16px" aria-label="Дожим">
+    <h2>Дожим с 17 ноября: две цепочки по 3 письма</h2>
+    <div class="gift">
+      <h2>Подарок за оплату в течение 48 часов</h2>
+      <ul>
+        <li>Спецкурс на выбор из 17 специализированных курсов</li>
+        <li>Вебинарный клуб на 3 месяца: записи и материалы вебинаров Академии</li>
+        <li>Запись конференции «Горизонты сметного дела» (её получают все участники акции)</li>
+      </ul>
+      <div style="font-size:13px;opacity:.8">Окно 48 часов считаем от письма, но не дольше 30 ноября, 23:59 МСК. Условия подарков согласуем с хранителем цен и отделом продаж до запуска.</div>
+    </div>
+    <div class="chains" id="chains"></div>
+  </section>
+
+  <footer id="upd"></footer>
+</div>
+
+<script src="files.js"></script>
+<script>
+const UPDATED = "16 ноября, 18:00 МСК";
+const TODAY = 16;
+const ST = {
+  ok:["s-ok","Отправлено"], wait:["s-wait","У Регины"], check:["s-check","На проверке у Ильдара"], work:["s-work","Пишем"], plan:["s-plan","План"]
+};
+const DOT = {ok:"var(--ok)",wait:"var(--wait)",check:"var(--check)",work:"var(--work)",plan:"var(--plan)"};
+const WD = ["вс","пн","вт","ср","чт","пт","сб"];
+
+const L = [
+  {d:11,t:"02:45",seg:"Тёплые малые сегменты, 3 письма",subj:"⚫ Чёрная пятница в Академии Сметного Дела: готовим лучшие условия",f:["11-11_pismo1_v6"],st:"ok",m:"Открытия <span class='num'>5,1–8,0%</span> · CTOR <span class='num'>3,5–9,4%</span> · рассылки 23635669, 23636563, 23636589"},
+  {d:11,t:"13:03",seg:"Начинающие, малый сегмент",subj:"⚫ Хотите стать сметчиком? В Чёрной пятнице…",st:"ok",m:"Открытия <span class='num'>3,0%</span> · CTOR <span class='num'>3,0%</span> · 23641544"},
+  {d:11,t:"13:23",seg:"Начинающие",subj:"⚫ ЧЁРНАЯ ПЯТНИЦА: профессия сметчика…",f:["11-11_nachinayushchie"],st:"ok",m:"Открытия <span class='num'>3,1%</span> · CTOR <span class='num'>4,9%</span> · отписки 0,18% · 23642028"},
+  {d:11,t:"13:27",seg:"Специалисты сметного дела",subj:"⚫ ЧЁРНАЯ ПЯТНИЦА для специалистов…",f:["11-11_specialisty"],st:"ok",m:"Открытия <span class='num'>4,6%</span> · CTOR <span class='num'>5,5%</span> · 23642125"},
+  {d:11,t:"20:57",seg:"Выпускники",subj:"⚫ Чёрная пятница: заберите 5 000 бонусных рублей и Ваши условия выпускника",f:["11-11_vypuskniki_podarok"],st:"ok",m:"Лучшее письмо акции: открытия <span class='num'>6,8%</span> · CTOR <span class='num'>10,8%</span> · 44 записи · 23651099"},
+  {d:13,t:"07:32",seg:"Начинающие",subj:"🚨 У нас в Академии ЧП",f:["13-11_nachinayushchie"],st:"ok",m:"Открытия <span class='num'>2,9%</span> · CTOR <span class='num'>4,8%</span> · отписки 0,14% · 23670226"},
+  {d:13,t:"07:50",seg:"Специалисты сметного дела",subj:"🚨 У нас в Академии ЧП",f:["13-11_specialisty"],st:"ok",m:"Открытия <span class='num'>4,5%</span> · CTOR <span class='num'>5,7%</span> · 23670285"},
+  {d:13,t:"08:01",seg:"Выпускники",subj:"🚨 У нас в Академии ЧП. Выпускникам особые условия",f:["13-11_vypuskniki"],st:"ok",m:"Открытия <span class='num'>7,0%</span> · CTOR <span class='num'>5,5%</span> · 23 записи · 23670349"},
+  {d:16,t:"08:00",seg:"Начинающие и специалисты, А/Б пополам",subj:"А: ⚫ Заберите 5 000 бонусных рублей до конца дня · Б: ⚫ Вас пока нет среди участников Чёрной пятницы",f:["16-11_A","16-11_B"],st:"wait",m:"Файлы переданы Регине, отправку и цифры сверим завтра · <code>07_Письма/Последний_день_16-11/</code>"},
+  {d:16,t:"08:00",seg:"Выпускники",subj:"⚫ Выпускникам: 5 000 бонусных рублей и цена выпускника",f:["16-11_vypuskniki"],st:"wait",m:"Отправку и цифры сверим завтра"},
+  {d:16,t:"19:30",seg:"Специалисты и выпускники, не открывшие утреннее",subj:"⚫ 5 000 бонусных рублей можно забрать до 23:59",f:["16-11_vecher_specialisty","16-11_vecher_vypuskniki"],st:"wait",m:"Два файла отправлены Регине в Битрикс в 16:19, тег ЧП26 исключить, начинающим не отправляем"},
+  {d:17,t:"08:00",seg:"Записавшиеся (тег ЧП26), кроме выпускников",subj:"⚫ Ваши условия Чёрной пятницы готовы",f:["17-11_zapisavshiesya"],st:"check",m:"Ссылка с <code>?b=1</code> · <code>07_Письма/Открытие_17-11/</code>"},
+  {d:17,t:"08:00",seg:"Записавшиеся выпускники (тег ЧП26)",subj:"⚫ Ваши условия выпускника и 5 000 бонусных рублей",f:["17-11_zapisavshiesya_vypuskniki"],st:"check",m:"Ссылка с <code>?b=1&seg=grad</code>"},
+  {d:17,t:"08:00",seg:"Мессенджеры: Telegram, MAX, ВК (тег ЧП26)",subj:"Сообщение «Чёрная пятница началась, Вы узнаёте условия первыми»",f:["17-11_messendzhery"],st:"check",m:"Два варианта: выпускники и остальные · <code>Мессенджеры_17-11_записавшиеся.md</code>"},
+  {d:17,t:"11:00",seg:"Выпускники без тега ЧП26",subj:"⚫ Выпускникам: цены Чёрной пятницы открыты",f:["17-11_vypuskniki"],st:"check",m:"Ссылка с <code>?seg=grad</code>"},
+  {d:17,t:"11:00",seg:"Специалисты сметного дела без тега ЧП26",subj:"⚫ Специалистам сметного дела: Чёрная пятница открыта",f:["17-11_specialisty"],st:"check",m:"Курс повышения квалификации, Годовая система, спецкурсы, Высотка для опытных"},
+  {d:17,t:"11:30",seg:"Начинающие без тега ЧП26, открывали письма за 90 дней",subj:"⚫ Курс начинающего сметчика в Чёрную пятницу",f:["17-11_nachinayushchie"],st:"check",m:"«Профессия», Гранд-Смета Модуль 1, Высотка для начинающих"},
+  {d:17,t:"весь день",seg:"Дожим: зашёл на страницу акции и не оставил заказ",subj:"Цепочка из 3 писем с подарком на 48 часов",st:"work",m:"Запуск по событию, см. схему ниже"},
+  {d:17,t:"весь день",seg:"Дожим: заказ без оплаты 48 часов",subj:"Цепочка из 3 писем с подарком на 48 часов",st:"work",m:"Запуск по событию, см. схему ниже"}
+];
+
+const NOTES = {16:"Последний день записи", 17:"Открытие акции", 30:"Конец акции 23:59"};
+
+const TODO = [
+  "Проверить 5 писем на 17.11 и текст для мессенджеров, после «да» отправить Регине.",
+  "Базе без тега ЧП26 страница с 17.11 тоже даёт кнопку «Получить 5 000 бонусных рублей», а письма 16.11 обещали бонус только до 23:59. Решить, оставлять ли кнопку для новых.",
+  "14 человек записались через форму консультации из письма 13.11: начислены ли им 5 000 бонусных рублей.",
+  "На странице акции в карточке «Стандарт» упомянуты разборы с экспертами, хотя по правилу встречи и разборы только в «Элите».",
+  "План писем на 18–30 ноября пока не составлен."
+];
+
+const CHAINS = [
+  {name:"Зашёл на страницу акции и не оставил заказ", trig:"Условие в GetCourse: посетил страницу chp2026/akciya, заказа в акции нет через 2 часа после визита. Работает для тех, кого GetCourse узнаёт по переходу из письма или по входу в кабинет. Регина проверит, какое условие о посещении страницы есть в процессах.", steps:[
+    ["Через 2 часа после визита","Вы смотрели курсы Чёрной пятницы: к оплате в ближайшие 48 часов дарим спецкурс на выбор и 3 месяца вебинарного клуба."],
+    ["Через 24 часа","Ответы на частые сомнения (рассрочка, документ об обучении, сколько времени займёт) и напоминание о подарке."],
+    ["За 4 часа до конца 48 часов","Подарок действует до конкретного времени, одна кнопка «Хочу курс»."]
+  ]},
+  {name:"Оставил заказ и не оплатил 48 часов", trig:"Условие в GetCourse: заказ из акции в статусе «Новый» или «Ожидаем оплаты» 48 часов. Куратор в это время звонит по своему регламенту, письма идут параллельно.", steps:[
+    ["Через 48 часов без оплаты","Ваш заказ ждёт. Оплатите в ближайшие 48 часов, и мы добавим к курсу спецкурс на выбор и 3 месяца вебинарного клуба."],
+    ["Через 24 часа","Как оплатить частями или от компании, кнопка на оплату заказа и контакт куратора."],
+    ["За 4 часа до конца 48 часов","Последнее напоминание о подарке, кнопка на оплату."]
+  ]}
+];
+
+const FILES = window.FILES || {};
+const NAMES = {"16-11_A":"письмо А","16-11_B":"письмо Б","16-11_vecher_specialisty":"специалистам","16-11_vecher_vypuskniki":"выпускникам"};
+function links(x){
+  if(!x.f) return "";
+  const out = [];
+  x.f.forEach(k=>{const F=FILES[k]; if(!F) return;
+    const nm = x.f.length>1 ? " ("+(NAMES[k]||k)+")" : "";
+    out.push(`<a class="lnk lnk-open" href="${F.href}" target="_blank" rel="noopener">Открыть письмо${nm}</a>`);
+    if(F.cta && !out.some(o=>o.includes("lnk-cta"))) out.push(`<a class="lnk lnk-cta" href="${F.cta}" target="_blank" rel="noopener" title="${F.cta}">Ссылка из письма ↗</a>`);
+  });
+  return out.length ? `<span class="lnks">${out.join("")}</span>` : "";
+}
+document.getElementById("legend").innerHTML = Object.values(ST).map(([c,n])=>`<span class="pill ${c}">${n}</span>`).join("");
+document.getElementById("todo").innerHTML = TODO.map(x=>`<li>${x}</li>`).join("");
+document.getElementById("upd").textContent = "Обновлено: " + UPDATED + ". Панель обновляет Claude после каждого письма.";
+
+const days = document.getElementById("days"), agenda = document.getElementById("agenda");
+for(let d=11; d<=30; d++){
+  const dt = new Date(2026,10,d), items = L.filter(x=>x.d===d);
+  const b = document.createElement("button");
+  b.className = "day" + (d===TODAY?" today":"") + (d===30?" end":"") + (d<17?" pre":"");
+  b.setAttribute("aria-label", d+" ноября, писем: "+items.length);
+  b.innerHTML = `<span class="wd">${WD[dt.getDay()]}</span><span class="n">${d}</span><span class="dots">${items.map(x=>`<i style="background:${DOT[x.st]}"></i>`).join("")}</span>`;
+  b.onclick = ()=>{const el=document.getElementById("d"+d); document.querySelectorAll(".dayblock.hl").forEach(e=>e.classList.remove("hl")); el.classList.add("hl"); el.scrollIntoView({block:"start"});};
+  days.appendChild(b);
+
+  if(!items.length && !NOTES[d]){
+    if(d===18){const g=document.createElement("article"); g.className="dayblock"; g.id="d18";
+      g.innerHTML=`<div class="dh"><span class="d">18–29 ноя</span><span class="w">две недели акции</span></div><div class="items"><div class="empty">План писем на эти дни пока не составлен. Дожим идёт по событиям каждый день.</div></div>`; agenda.appendChild(g);}
+    if(d>18) b.onclick=()=>document.getElementById("d18").scrollIntoView({block:"start"});
+    continue;
+  }
+  const blk = document.createElement("article");
+  blk.className = "dayblock"; blk.id = "d"+d;
+  const head = `<div class="dh"><span class="d">${d} ноя</span><span class="w">${["воскресенье","понедельник","вторник","среда","четверг","пятница","суббота"][dt.getDay()]}</span>${NOTES[d]?`<span class="note">${NOTES[d]}</span>`:""}</div>`;
+  const body = items.length ? items.map(x=>`<div class="item"><span class="t">${x.t}</span><div class="body"><span class="seg">${x.seg}</span><span class="subj">${x.subj}</span><span class="meta">${x.m}</span>${links(x)}</div><span class="st pill ${ST[x.st][0]}">${ST[x.st][1]}</span></div>`).join("") : `<div class="empty">Писем пока нет в плане</div>`;
+  blk.innerHTML = head + `<div class="items">${body}</div>`;
+  agenda.appendChild(blk);
+}
+
+document.getElementById("chains").innerHTML = CHAINS.map(c=>`<div class="chain"><h2>${c.name}</h2><div class="trig">${c.trig}</div><div class="steps">${c.steps.map((s,i)=>`<div class="step"><span class="k">${i+1}</span><div><b>${s[0]}</b>${s[1]}</div></div>`).join("")}</div><span class="pill s-work" style="justify-self:start">Пишем</span></div>`).join("");
+</script>
+
+</body>
+</html>
