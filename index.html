@@ -72,6 +72,17 @@ h2{font-family:var(--display);font-size:22px;margin:0;text-wrap:balance}
 .meta code{font-size:12px;background:var(--plan-bg);padding:1px 5px;border-radius:4px;word-break:break-all}
 .num{font-variant-numeric:tabular-nums;font-weight:700;color:var(--ink)}
 .empty{color:var(--muted);font-size:14px}
+.checks{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:8px}
+.ck{display:inline-flex;align-items:flex-start;gap:6px;font-size:13px;cursor:pointer;user-select:none}
+.ck input{width:16px;height:16px;margin:1px 0 0;accent-color:var(--ok);cursor:pointer}
+.ck small{display:block;color:var(--muted);font-size:11px;line-height:1.2}
+.ck.on span{font-weight:600}
+.whobar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:14px}
+.whobar button{all:unset;cursor:pointer;padding:5px 12px;border-radius:999px;border:1px solid var(--line);background:var(--panel);font-weight:600;font-size:13px}
+.whobar button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.whobar button:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+.whobar input{font:inherit;font-size:13px;padding:5px 10px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--ink);width:150px}
+.sync{font-size:12px;color:var(--muted)}
 .lnks{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
 .lnk{font-size:13px;font-weight:600;text-decoration:none;padding:5px 11px;border-radius:8px;border:1px solid var(--line)}
 .lnk-open{background:var(--ink);color:var(--bg);border-color:var(--ink)}
@@ -109,6 +120,7 @@ footer{color:var(--muted);font-size:13px}
     <h1>Письма <b>Чёрной пятницы</b> 2026</h1>
     <p class="sub">Все письма и сообщения акции по дням: кому, во сколько, с какой темой и на каком этапе. Запись на участие 11–16 ноября, акция 17–30 ноября до 23:59 МСК. Цифры открытий и CTOR взяты из журнала рассылок, замер на второй день.</p>
     <div class="legend" id="legend"></div>
+    <div class="whobar" id="whobar"><span>Кто отмечает:</span><button type="button" data-who="Ильдар" id="who-ildar">Ильдар</button><button type="button" data-who="Регина" id="who-regina">Регина</button><input id="who-other" type="text" maxlength="30" placeholder="Другое имя" aria-label="Другое имя"><span class="sync" id="sync">Загружаю отметки…</span></div>
   </header>
 
   <section class="strip" aria-label="Дни">
@@ -142,7 +154,7 @@ footer{color:var(--muted);font-size:13px}
 
 <script src="files.js"></script>
 <script>
-const UPDATED = "16 ноября, 18:00 МСК";
+const UPDATED = "16 ноября, 19:30 МСК";
 const TODAY = 16;
 const ST = {
   ok:["s-ok","Отправлено"], wait:["s-wait","У Регины"], check:["s-check","На проверке у Ильдара"], work:["s-work","Пишем"], plan:["s-plan","План"]
@@ -207,6 +219,49 @@ function links(x){
   });
   return out.length ? `<span class="lnks">${out.join("")}</span>` : "";
 }
+L.forEach(x=>{ x.k = (x.f && x.f[0]) || ("d"+x.d+"_"+x.t.replace(/\D/g,"")+"_"+x.seg.length); });
+const SB_URL = "https://zmbzgkeokedqesoilcmj.supabase.co/rest/v1/chp26_letter_checks";
+const SB_KEY = "sb_publishable_rLRV5jNYBuzEcQWDQbnnQA_9mEWldEN";
+const STEPS = [["reviewed","Ильдар проверил"],["approved","Ильдар утвердил"],["allowed","Регине можно отправлять"],["sent","Отправлено"]];
+let CHECKS = {};
+let WHO = ""; try{ WHO = localStorage.getItem("chp26_who") || ""; }catch(e){}
+function fmt(ts){ try{ const d=new Date(ts); return d.toLocaleString("ru-RU",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit",timeZone:"Europe/Moscow"}); }catch(e){ return ""; } }
+function checks(x){
+  return `<span class="checks">${STEPS.map(([s,n])=>{ const c=CHECKS[x.k+"|"+s]; const on=c&&c.done;
+    return `<label class="ck${on?" on":""}"><input type="checkbox" id="ck_${x.k}_${s}" data-k="${x.k}" data-s="${s}"${on?" checked":""}><span>${n}${on&&c.who?`<small>${c.who}, ${fmt(c.at)}</small>`:""}</span></label>`; }).join("")}</span>`;
+}
+function setWho(n){ WHO=n; try{ localStorage.setItem("chp26_who",n); }catch(e){}
+  document.querySelectorAll("#whobar button").forEach(b=>b.setAttribute("aria-pressed", String(b.dataset.who===n)));
+  const o=document.getElementById("who-other"); if(!["Ильдар","Регина"].includes(n)) o.value=n; }
+document.querySelectorAll("#whobar button").forEach(b=>b.onclick=()=>setWho(b.dataset.who));
+document.getElementById("who-other").addEventListener("change",e=>{ const v=e.target.value.trim(); if(v) setWho(v); });
+if(WHO) setWho(WHO);
+const H = {"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Content-Type":"application/json"};
+function sync(t){ document.getElementById("sync").textContent=t; }
+function paint(){
+  L.forEach(x=>{
+    STEPS.forEach(([s,n])=>{ const el=document.getElementById(`ck_${x.k}_${s}`); if(!el) return; const c=CHECKS[x.k+"|"+s]; const on=!!(c&&c.done);
+      el.checked=on; const lab=el.closest(".ck"); lab.classList.toggle("on",on);
+      lab.querySelector("span").innerHTML = n + (on&&c.who?`<small>${c.who}, ${fmt(c.at)}</small>`:""); });
+    const pill=document.querySelector(`[data-pill="${x.k}"]`); const sent=CHECKS[x.k+"|sent"];
+    if(pill){ const st = (sent&&sent.done) ? "ok" : x.st; pill.className = "st pill "+ST[st][0]; pill.textContent = ST[st][1]; }
+  });
+}
+async function load(){
+  try{ const r=await fetch(SB_URL+"?select=*",{headers:H}); if(!r.ok) throw 0; const rows=await r.json();
+    CHECKS={}; rows.forEach(r=>CHECKS[r.letter_key+"|"+r.step]=r); paint(); sync("Отметки видят все, кто открывает календарь");
+  }catch(e){ sync("Отметки сейчас не загрузились, обновите страницу"); }
+}
+document.addEventListener("change", async e=>{
+  const el=e.target; if(!el.matches(".ck input")) return;
+  if(!WHO){ el.checked=!el.checked; sync("Сначала выберите вверху, кто отмечает"); document.getElementById("whobar").scrollIntoView({block:"center"}); return; }
+  const row={letter_key:el.dataset.k, step:el.dataset.s, done:el.checked, who:WHO, at:new Date().toISOString()};
+  CHECKS[row.letter_key+"|"+row.step]=row; paint(); sync("Сохраняю…");
+  try{ const r=await fetch(SB_URL+"?on_conflict=letter_key,step",{method:"POST",headers:{...H,"Prefer":"resolution=merge-duplicates,return=minimal"},body:JSON.stringify([row])});
+    if(!r.ok) throw 0; sync("Сохранено: "+WHO);
+  }catch(err){ el.checked=!el.checked; delete CHECKS[row.letter_key+"|"+row.step]; paint(); sync("Не сохранилось, попробуйте ещё раз"); }
+});
+setInterval(load, 60000);
 document.getElementById("legend").innerHTML = Object.values(ST).map(([c,n])=>`<span class="pill ${c}">${n}</span>`).join("");
 document.getElementById("todo").innerHTML = TODO.map(x=>`<li>${x}</li>`).join("");
 document.getElementById("upd").textContent = "Обновлено: " + UPDATED + ". Панель обновляет Claude после каждого письма.";
@@ -230,11 +285,12 @@ for(let d=11; d<=30; d++){
   const blk = document.createElement("article");
   blk.className = "dayblock"; blk.id = "d"+d;
   const head = `<div class="dh"><span class="d">${d} ноя</span><span class="w">${["воскресенье","понедельник","вторник","среда","четверг","пятница","суббота"][dt.getDay()]}</span>${NOTES[d]?`<span class="note">${NOTES[d]}</span>`:""}</div>`;
-  const body = items.length ? items.map(x=>`<div class="item"><span class="t">${x.t}</span><div class="body"><span class="seg">${x.seg}</span><span class="subj">${x.subj}</span><span class="meta">${x.m}</span>${links(x)}</div><span class="st pill ${ST[x.st][0]}">${ST[x.st][1]}</span></div>`).join("") : `<div class="empty">Писем пока нет в плане</div>`;
+  const body = items.length ? items.map(x=>`<div class="item"><span class="t">${x.t}</span><div class="body"><span class="seg">${x.seg}</span><span class="subj">${x.subj}</span><span class="meta">${x.m}</span>${links(x)}${checks(x)}</div><span class="st pill ${ST[x.st][0]}" data-pill="${x.k}">${ST[x.st][1]}</span></div>`).join("") : `<div class="empty">Писем пока нет в плане</div>`;
   blk.innerHTML = head + `<div class="items">${body}</div>`;
   agenda.appendChild(blk);
 }
 
+load();
 document.getElementById("chains").innerHTML = CHAINS.map(c=>`<div class="chain"><h2>${c.name}</h2><div class="trig">${c.trig}</div><div class="steps">${c.steps.map((s,i)=>`<div class="step"><span class="k">${i+1}</span><div><b>${s[0]}</b>${s[1]}</div></div>`).join("")}</div><span class="pill s-work" style="justify-self:start">Пишем</span></div>`).join("");
 </script>
 
